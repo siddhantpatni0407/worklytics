@@ -38,4 +38,5 @@ impl From<tauri::Error> for WorklyticsError {
     }
 }
 
+#[allow(dead_code)]
 pub type Result<T> = std::result::Result<T, WorklyticsError>;
