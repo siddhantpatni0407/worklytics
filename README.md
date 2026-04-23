@@ -439,7 +439,7 @@ flowchart LR
 ### 1. Clone the repository
 
 ```bash
-git clone https://github.com/your-org/worklytics.git
+git clone https://github.com/siddhantpatni0407/worklytics.git
 cd worklytics
 ```
 
@@ -701,4 +701,4 @@ graph LR
 
 ## License
 
-MIT © Worklytics Contributors
+SP © Worklytics Contributors
