@@ -228,13 +228,13 @@ sequenceDiagram
 
 ```mermaid
 flowchart TD
-    A["Given Date"] --> B{Approved Leave\ncovers this date?}
+    A["Given Date"] --> B{Approved Leave<br>covers this date?}
     B -- Yes --> LEAVE["✅ LEAVE"]
-    B -- No  --> C{Holiday on\nthis date?}
+    B -- No  --> C{Holiday on<br>this date?}
     C -- Yes --> HOLIDAY["🎉 HOLIDAY"]
-    C -- No  --> D{Manual work\nentry exists?}
+    C -- No  --> D{Manual work<br>entry exists?}
     D -- Yes --> WORK["💼 WFO / WFH / WFC"]
-    D -- No  --> E{Saturday or Sunday?\n(unless overridden\nin Settings)}
+    D -- No  --> E{Saturday or Sunday?<br>(unless overridden<br>in Settings)}
     E -- Yes --> WEEKEND["🌤️ WEEKEND"]
     E -- No  --> UNSET["⬜ UNSET"]
 ```
@@ -779,7 +779,7 @@ graph LR
     end
 
     subgraph State
-        AS[appStore – Zustand\n(persisted)]
+        AS[appStore - Zustand<br>(persisted)]
     end
 
     subgraph API
