@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { Plus, RefreshCw, ListTodo, CheckSquare, Clock, Tag } from "lucide-react";
+import { Plus, RefreshCw, ListTodo, CheckSquare, Clock, AlertCircle } from "lucide-react";
 import toast from "react-hot-toast";
 import { getAllTasks, addTask, updateTask, deleteTask } from "@/utils/tauriCommands";
 import { useAppStore } from "@/store/appStore";
@@ -8,8 +8,44 @@ import Modal from "@/components/common/Modal";
 import ConfirmDialog from "@/components/common/ConfirmDialog";
 import TaskCard from "@/components/tasks/TaskCard";
 import TaskForm from "@/components/tasks/TaskForm";
-import TaskFilters, { DEFAULT_FILTERS, type TaskFiltersState } from "@/components/tasks/TaskFilters";
-import { todayISO } from "@/utils/dateUtils";
+import TaskFilters, {
+  DEFAULT_FILTERS,
+  type TaskFiltersState,
+  type TaskPeriod,
+} from "@/components/tasks/TaskFilters";
+import { todayISO, formatDateISO } from "@/utils/dateUtils";
+import {
+  startOfWeek, endOfWeek, startOfMonth, endOfMonth,
+  startOfYear, endOfYear,
+} from "date-fns";
+
+// ─── Resolve the from/to ISO strings for a given period ──────────────────────
+function resolvePeriodRange(period: TaskPeriod, customFrom: string, customTo: string): { from: string; to: string } {
+  const today = new Date();
+  switch (period) {
+    case "TODAY":
+      return { from: todayISO(), to: todayISO() };
+    case "THIS_WEEK":
+      return {
+        from: formatDateISO(startOfWeek(today, { weekStartsOn: 1 })),
+        to:   formatDateISO(endOfWeek(today,   { weekStartsOn: 1 })),
+      };
+    case "THIS_MONTH":
+      return {
+        from: formatDateISO(startOfMonth(today)),
+        to:   formatDateISO(endOfMonth(today)),
+      };
+    case "THIS_YEAR":
+      return {
+        from: formatDateISO(startOfYear(today)),
+        to:   formatDateISO(endOfYear(today)),
+      };
+    case "ALL":
+      return { from: "", to: "" };
+    case "CUSTOM":
+      return { from: customFrom, to: customTo };
+  }
+}
 
 export default function TasksPage() {
   const { tasksRefreshKey, triggerTasksRefresh } = useAppStore();
@@ -22,7 +58,7 @@ export default function TasksPage() {
 
   const [filters, setFilters] = useState<TaskFiltersState>(DEFAULT_FILTERS);
 
-  // ── Fetch ────────────────────────────────────────────────────────────────
+  // ── Fetch all tasks once ─────────────────────────────────────────────────
   const fetchTasks = useCallback(async () => {
     setLoading(true);
     try {
@@ -37,7 +73,13 @@ export default function TasksPage() {
 
   useEffect(() => { fetchTasks(); }, [fetchTasks, tasksRefreshKey]);
 
-  // ── All unique tags (for filter dropdown) ────────────────────────────────
+  // ── Resolved date range for the current period ───────────────────────────
+  const { from: resolvedFrom, to: resolvedTo } = useMemo(
+    () => resolvePeriodRange(filters.period, filters.dateFrom, filters.dateTo),
+    [filters.period, filters.dateFrom, filters.dateTo]
+  );
+
+  // ── All unique tags ───────────────────────────────────────────────────────
   const allTags = useMemo(() => {
     const set = new Set<string>();
     tasks.forEach((t) => {
@@ -46,32 +88,40 @@ export default function TasksPage() {
     return Array.from(set).sort();
   }, [tasks]);
 
-  // ── Filtered tasks ───────────────────────────────────────────────────────
+  // ── Filtered tasks ────────────────────────────────────────────────────────
   const filtered = useMemo(() => {
     return tasks.filter((t) => {
+      // Period / date range
+      if (resolvedFrom && t.date < resolvedFrom) return false;
+      if (resolvedTo   && t.date > resolvedTo)   return false;
+      // Status
       if (filters.status !== "ALL" && t.status !== filters.status) return false;
+      // Search
       if (filters.search) {
         const q = filters.search.toLowerCase();
-        if (!t.title.toLowerCase().includes(q) && !t.details.toLowerCase().includes(q) && !t.notes.toLowerCase().includes(q)) return false;
+        if (
+          !t.title.toLowerCase().includes(q) &&
+          !t.details.toLowerCase().includes(q) &&
+          !t.notes.toLowerCase().includes(q)
+        ) return false;
       }
+      // Tag
       if (filters.tag) {
         const tags = t.tags.split(",").map((s) => s.trim());
         if (!tags.includes(filters.tag)) return false;
       }
-      if (filters.dateFrom && t.date < filters.dateFrom) return false;
-      if (filters.dateTo   && t.date > filters.dateTo)   return false;
       return true;
     });
-  }, [tasks, filters]);
+  }, [tasks, filters, resolvedFrom, resolvedTo]);
 
-  // ── Stats ────────────────────────────────────────────────────────────────
+  // ── Stats (from filtered set) ─────────────────────────────────────────────
   const stats = useMemo(() => ({
-    total:      tasks.length,
-    completed:  tasks.filter((t) => t.status === "COMPLETED").length,
-    inProgress: tasks.filter((t) => t.status === "IN_PROGRESS").length,
-    blocked:    tasks.filter((t) => t.status === "BLOCKED").length,
-    hours:      tasks.reduce((sum, t) => sum + t.timeSpent, 0),
-  }), [tasks]);
+    total:      filtered.length,
+    completed:  filtered.filter((t) => t.status === "COMPLETED").length,
+    inProgress: filtered.filter((t) => t.status === "IN_PROGRESS").length,
+    blocked:    filtered.filter((t) => t.status === "BLOCKED").length,
+    hours:      filtered.reduce((sum, t) => sum + t.timeSpent, 0),
+  }), [filtered]);
 
   // ── Actions ──────────────────────────────────────────────────────────────
   const handleAdd = async (payload: CreateTaskPayload | UpdateTaskPayload) => {
@@ -96,7 +146,7 @@ export default function TasksPage() {
     triggerTasksRefresh();
   };
 
-  // ── Group filtered tasks by date ──────────────────────────────────────────
+  // ── Group filtered tasks by date (newest date first) ─────────────────────
   const grouped = useMemo(() => {
     const map = new Map<string, Task[]>();
     filtered.forEach((t) => {
@@ -104,7 +154,6 @@ export default function TasksPage() {
       arr.push(t);
       map.set(t.date, arr);
     });
-    // Sort dates descending
     return Array.from(map.entries()).sort(([a], [b]) => b.localeCompare(a));
   }, [filtered]);
 
@@ -134,13 +183,23 @@ export default function TasksPage() {
         </div>
       </div>
 
-      {/* ── Stats ───────────────────────────────────────────────────────── */}
+      {/* ── Filters ─────────────────────────────────────────────────────── */}
+      <TaskFilters
+        filters={filters}
+        allTags={allTags}
+        resolvedFrom={resolvedFrom}
+        resolvedTo={resolvedTo}
+        onChange={setFilters}
+        onReset={() => setFilters(DEFAULT_FILTERS)}
+      />
+
+      {/* ── Stats (reflect filtered set) ────────────────────────────────── */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         {[
           { icon: ListTodo,    label: "Total",       value: stats.total,      color: "text-brand-500"   },
           { icon: CheckSquare, label: "Completed",   value: stats.completed,  color: "text-emerald-500" },
           { icon: RefreshCw,   label: "In Progress", value: stats.inProgress, color: "text-blue-500"    },
-          { icon: Clock,       label: "Hours Logged",value: `${stats.hours.toFixed(1)}h`, color: "text-violet-500" },
+          { icon: AlertCircle, label: "Blocked",     value: stats.blocked,    color: "text-red-500"     },
         ].map(({ icon: Icon, label, value, color }) => (
           <div key={label} className="wl-card px-4 py-3 flex items-center gap-3">
             <Icon className={`h-5 w-5 ${color}`} />
@@ -152,13 +211,14 @@ export default function TasksPage() {
         ))}
       </div>
 
-      {/* ── Filters ─────────────────────────────────────────────────────── */}
-      <TaskFilters
-        filters={filters}
-        allTags={allTags}
-        onChange={setFilters}
-        onReset={() => setFilters(DEFAULT_FILTERS)}
-      />
+      {/* ── Hours logged ────────────────────────────────────────────────── */}
+      {stats.hours > 0 && (
+        <div className="wl-card px-4 py-2.5 flex items-center gap-2 text-sm">
+          <Clock className="h-4 w-4 text-violet-500" />
+          <span className="font-semibold text-app-primary">{stats.hours.toFixed(1)}h</span>
+          <span className="text-app-muted">logged in this period</span>
+        </div>
+      )}
 
       {/* ── Task list ───────────────────────────────────────────────────── */}
       {loading ? (
@@ -179,7 +239,7 @@ export default function TasksPage() {
           <p className="text-sm text-app-muted mt-1">
             {tasks.length === 0
               ? "Add your first task to start tracking your work"
-              : "Try adjusting your filters"}
+              : "No tasks match the current filters"}
           </p>
           {tasks.length === 0 && (
             <button
@@ -198,7 +258,7 @@ export default function TasksPage() {
               <div className="flex items-center gap-3 mb-2">
                 <span className="text-xs font-semibold text-app-muted uppercase tracking-wide">
                   {new Date(date + "T12:00:00").toLocaleDateString("en-US", {
-                    weekday: "long", month: "short", day: "numeric", year: "numeric"
+                    weekday: "long", month: "short", day: "numeric", year: "numeric",
                   })}
                 </span>
                 <span className="text-xs bg-slate-100 dark:bg-slate-700 text-app-muted px-1.5 py-0.5 rounded-full">

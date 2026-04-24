@@ -1,17 +1,25 @@
-import { Search, X, Filter } from "lucide-react";
+import { Search, X, Filter, Calendar } from "lucide-react";
+import { cn } from "@/utils/cn";
 import type { TaskStatus } from "@/types";
+
+// ─── Period type ──────────────────────────────────────────────────────────────
+export type TaskPeriod = "TODAY" | "THIS_WEEK" | "THIS_MONTH" | "THIS_YEAR" | "ALL" | "CUSTOM";
 
 export interface TaskFiltersState {
   search: string;
   status: TaskStatus | "ALL";
   tag: string;
-  dateFrom: string;
-  dateTo: string;
+  period: TaskPeriod;
+  dateFrom: string; // only used when period === "CUSTOM"
+  dateTo: string;   // only used when period === "CUSTOM"
 }
 
 interface TaskFiltersProps {
   filters: TaskFiltersState;
   allTags: string[];
+  /** Resolved date range currently in effect (for display hint). */
+  resolvedFrom: string;
+  resolvedTo: string;
   onChange: (filters: TaskFiltersState) => void;
   onReset: () => void;
 }
@@ -23,29 +31,48 @@ const STATUS_OPTIONS: { value: TaskStatus | "ALL"; label: string }[] = [
   { value: "BLOCKED",     label: "Blocked"      },
 ];
 
+const PERIOD_OPTIONS: { value: TaskPeriod; label: string }[] = [
+  { value: "TODAY",      label: "Today"      },
+  { value: "THIS_WEEK",  label: "This Week"  },
+  { value: "THIS_MONTH", label: "This Month" },
+  { value: "THIS_YEAR",  label: "This Year"  },
+  { value: "ALL",        label: "All Time"   },
+  { value: "CUSTOM",     label: "Custom"     },
+];
+
 export const DEFAULT_FILTERS: TaskFiltersState = {
-  search: "",
-  status: "ALL",
-  tag: "",
+  search:   "",
+  status:   "ALL",
+  tag:      "",
+  period:   "THIS_MONTH",
   dateFrom: "",
-  dateTo: "",
+  dateTo:   "",
 };
 
-export default function TaskFilters({ filters, allTags, onChange, onReset }: TaskFiltersProps) {
+export default function TaskFilters({
+  filters,
+  allTags,
+  resolvedFrom,
+  resolvedTo,
+  onChange,
+  onReset,
+}: TaskFiltersProps) {
   const set = (field: keyof TaskFiltersState) => (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
   ) => onChange({ ...filters, [field]: e.target.value });
+
+  const setPeriod = (period: TaskPeriod) => onChange({ ...filters, period });
 
   const hasActive =
     filters.search ||
     filters.status !== "ALL" ||
     filters.tag ||
-    filters.dateFrom ||
-    filters.dateTo;
+    filters.period !== "THIS_MONTH";
 
   return (
-    <div className="wl-card p-4">
-      <div className="flex items-center gap-2 mb-3">
+    <div className="wl-card p-4 space-y-3">
+      {/* ── Header ─────────────────────────────────────────────────────── */}
+      <div className="flex items-center gap-2">
         <Filter className="h-4 w-4 text-app-muted" />
         <span className="text-sm font-semibold text-app-primary">Filters</span>
         {hasActive && (
@@ -53,20 +80,65 @@ export default function TaskFilters({ filters, allTags, onChange, onReset }: Tas
             onClick={onReset}
             className="ml-auto flex items-center gap-1 text-xs text-red-500 hover:text-red-700 transition-colors"
           >
-            <X className="h-3 w-3" /> Clear
+            <X className="h-3 w-3" /> Reset
           </button>
         )}
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+      {/* ── Period quick-select ────────────────────────────────────────── */}
+      <div className="flex flex-wrap gap-1.5">
+        {PERIOD_OPTIONS.map(({ value, label }) => (
+          <button
+            key={value}
+            onClick={() => setPeriod(value)}
+            className={cn(
+              "rounded-full px-3 py-1 text-xs font-medium border transition-colors",
+              filters.period === value
+                ? "bg-brand-600 border-brand-600 text-white"
+                : "border-[var(--border-card)] text-app-secondary hover:border-brand-400 hover:text-brand-600"
+            )}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {/* ── Custom date range (only when CUSTOM selected) ─────────────── */}
+      {filters.period === "CUSTOM" ? (
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="wl-label text-[11px] mb-1">From</label>
+            <input type="date" value={filters.dateFrom} onChange={set("dateFrom")} className="wl-input" />
+          </div>
+          <div>
+            <label className="wl-label text-[11px] mb-1">To</label>
+            <input type="date" value={filters.dateTo} onChange={set("dateTo")} className="wl-input" />
+          </div>
+        </div>
+      ) : (
+        /* Show the resolved range as a readable hint */
+        resolvedFrom && (
+          <div className="flex items-center gap-1.5 text-xs text-app-muted">
+            <Calendar className="h-3 w-3" />
+            <span>
+              {resolvedFrom === resolvedTo
+                ? resolvedFrom
+                : `${resolvedFrom} → ${resolvedTo}`}
+            </span>
+          </div>
+        )
+      )}
+
+      {/* ── Search / Status / Tag row ──────────────────────────────────── */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         {/* Search */}
-        <div className="relative col-span-2 md:col-span-1">
+        <div className="relative">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-app-muted pointer-events-none" />
           <input
             type="text"
             value={filters.search}
             onChange={set("search")}
-            placeholder="Search tasks…"
+            placeholder="Search title, details, notes…"
             className="wl-input pl-8"
           />
         </div>
@@ -85,28 +157,6 @@ export default function TaskFilters({ filters, allTags, onChange, onReset }: Tas
             <option key={t} value={t}>{t}</option>
           ))}
         </select>
-
-        {/* Date from */}
-        <div>
-          <input
-            type="date"
-            value={filters.dateFrom}
-            onChange={set("dateFrom")}
-            className="wl-input"
-            title="From date"
-          />
-        </div>
-
-        {/* Date to */}
-        <div>
-          <input
-            type="date"
-            value={filters.dateTo}
-            onChange={set("dateTo")}
-            className="wl-input"
-            title="To date"
-          />
-        </div>
       </div>
     </div>
   );
