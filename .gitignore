@@ -11,6 +11,7 @@ node_modules
 dist
 dist-ssr
 *.local
+package-lock.json
 
 # Editor directories and files
 .vscode/*
@@ -26,6 +27,7 @@ dist-ssr
 # Rust / Cargo
 target/
 Cargo.lock
+src-tauri/icons
 
 # Tauri build output
 src-tauri/target/
