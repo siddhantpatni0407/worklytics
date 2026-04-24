@@ -4,7 +4,9 @@ import CalendarPage from "@/pages/CalendarPage";
 import DashboardPage from "@/pages/DashboardPage";
 import HolidaysPage from "@/pages/HolidaysPage";
 import LeavesPage from "@/pages/LeavesPage";
+import NotesPage from "@/pages/NotesPage";
 import SettingsPage from "@/pages/SettingsPage";
+import TasksPage from "@/pages/TasksPage";
 
 export default function App() {
   return (
@@ -14,6 +16,8 @@ export default function App() {
         <Route path="/dashboard"  element={<DashboardPage />} />
         <Route path="/holidays"   element={<HolidaysPage />} />
         <Route path="/leaves"     element={<LeavesPage />} />
+        <Route path="/tasks"      element={<TasksPage />} />
+        <Route path="/notes"      element={<NotesPage />} />
         <Route path="/settings"   element={<SettingsPage />} />
         <Route path="*"           element={<Navigate to="/" replace />} />
       </Routes>

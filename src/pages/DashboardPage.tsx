@@ -1,10 +1,15 @@
 import { useEffect, useState, useCallback } from "react";
-import { Briefcase, Home, Building2, UmbrellaOff, PartyPopper, Download, RefreshCw } from "lucide-react";
+import { Briefcase, Home, Building2, UmbrellaOff, PartyPopper, Download, RefreshCw, FileSpreadsheet } from "lucide-react";
 import toast from "react-hot-toast";
-import { getYearlyAnalytics, getSummaryStats, exportYearlyCsv } from "@/utils/tauriCommands";
+import * as XLSX from "xlsx";
+import {
+  getYearlyAnalytics, getSummaryStats, exportYearlyCsv,
+  getTasksByRange, writeExcelFile, getMonthStatuses,
+} from "@/utils/tauriCommands";
+import { buildWorkSheet, buildTaskSheet } from "@/utils/excelExport";
 import { useAppStore } from "@/store/appStore";
 import type { YearlyAnalytics, SummaryStats } from "@/types";
-import { yearRange } from "@/utils/dateUtils";
+import { yearRangeFromBounds } from "@/utils/dateUtils";
 import StatsCard from "@/components/dashboard/StatsCard";
 import MonthlyChart from "@/components/dashboard/MonthlyChart";
 import YearlyTrendChart from "@/components/dashboard/YearlyTrendChart";
@@ -12,8 +17,8 @@ import StatusDistributionChart from "@/components/dashboard/StatusDistributionCh
 import Button from "@/components/common/Button";
 
 export default function DashboardPage() {
-  const { selectedYear, setSelectedYear, analyticsRefreshKey } = useAppStore();
-  const years = yearRange(selectedYear);
+  const { selectedYear, setSelectedYear, analyticsRefreshKey, settings } = useAppStore();
+  const years = yearRangeFromBounds(settings.yearStart, settings.yearEnd);
 
   const [yearlyData, setYearlyData]   = useState<YearlyAnalytics | null>(null);
   const [summaryStats, setSummaryStats] = useState<SummaryStats | null>(null);
@@ -43,9 +48,33 @@ export default function DashboardPage() {
     setExporting(true);
     try {
       const path = await exportYearlyCsv(selectedYear);
-      toast.success(`Exported to: ${path}`);
+      toast.success(`CSV exported to: ${path}`);
+    } catch {
+      toast.error("CSV export failed");
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const handleExportExcel = async () => {
+    setExporting(true);
+    try {
+      // Collect all 12 months of statuses + tasks for the year
+      const months = Array.from({ length: 12 }, (_, i) => i + 1);
+      const [allStatuses, tasks] = await Promise.all([
+        Promise.all(months.map((m) => getMonthStatuses(selectedYear, m))).then((arrs) => arrs.flat()),
+        getTasksByRange(`${selectedYear}-01-01`, `${selectedYear}-12-31`),
+      ]);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, buildWorkSheet(allStatuses), "Work Status");
+      if (tasks.length > 0) XLSX.utils.book_append_sheet(wb, buildTaskSheet(tasks), "Tasks");
+      const buf: ArrayBuffer = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+      const bytes = Array.from(new Uint8Array(buf));
+      const path = await writeExcelFile(`worklytics_${selectedYear}.xlsx`, bytes);
+      toast.success(`Excel exported to: ${path}`);
     } catch (err) {
-      toast.error("Export failed");
+      toast.error("Excel export failed");
+      console.error(err);
     } finally {
       setExporting(false);
     }
@@ -85,7 +114,16 @@ export default function DashboardPage() {
             loading={exporting}
             leftIcon={<Download className="h-3.5 w-3.5" />}
           >
-            Export CSV
+            CSV
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={handleExportExcel}
+            loading={exporting}
+            leftIcon={<FileSpreadsheet className="h-3.5 w-3.5" />}
+          >
+            Excel
           </Button>
         </div>
       </div>
