@@ -136,6 +136,110 @@ export interface SetWorkEntryPayload {
 }
 
 // ---------------------------------------------------------------------------
+// Tasks
+// ---------------------------------------------------------------------------
+
+export type TaskStatus = "IN_PROGRESS" | "COMPLETED" | "BLOCKED";
+
+export interface Task {
+  id: number;
+  date: string;          // "YYYY-MM-DD"
+  title: string;
+  details: string;
+  notes: string;
+  status: TaskStatus;
+  tags: string;          // comma-separated
+  timeSpent: number;     // hours
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateTaskPayload {
+  date: string;
+  title: string;
+  details?: string;
+  notes?: string;
+  status?: TaskStatus;
+  tags?: string;
+  timeSpent?: number;
+}
+
+export interface UpdateTaskPayload {
+  id: number;
+  date?: string;
+  title?: string;
+  details?: string;
+  notes?: string;
+  status?: TaskStatus;
+  tags?: string;
+  timeSpent?: number;
+}
+
+// ---------------------------------------------------------------------------
+// App Settings
+// ---------------------------------------------------------------------------
+
+export type ThemeMode = "light" | "dark" | "system";
+
+export interface AppSettings {
+  theme: ThemeMode;
+  timezone: string;
+  yearStart: number;
+  yearEnd: number;
+  workSaturday: boolean;
+  workSunday: boolean;
+}
+
+export const DEFAULT_SETTINGS: AppSettings = {
+  theme: "system",
+  timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "Asia/Kolkata",
+  yearStart: 2020,
+  yearEnd: 2050,
+  workSaturday: false,
+  workSunday: false,
+};
+
+// ---------------------------------------------------------------------------
+// Sticky Notes
+// ---------------------------------------------------------------------------
+
+export type NoteColor = "yellow" | "blue" | "green" | "pink" | "purple";
+
+export interface StickyNote {
+  id: number;
+  title: string;
+  content: string;
+  color: NoteColor;
+  pinned: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateNotePayload {
+  title?: string;
+  content: string;
+  color?: NoteColor;
+}
+
+export interface UpdateNotePayload {
+  id: number;
+  title?: string;
+  content?: string;
+  color?: NoteColor;
+  pinned?: boolean;
+}
+
+// ---------------------------------------------------------------------------
+// Database Configuration
+// ---------------------------------------------------------------------------
+
+export interface DbPathInfo {
+  currentPath: string;
+  defaultPath: string;
+  isCustom: boolean;
+}
+
+// ---------------------------------------------------------------------------
 // UI helpers
 // ---------------------------------------------------------------------------
 

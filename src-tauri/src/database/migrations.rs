@@ -41,10 +41,46 @@ pub fn run_migrations(conn: &Connection) -> Result<(), WorklyticsError> {
             updated_at  TEXT    NOT NULL DEFAULT (datetime('now'))
         );
 
+        -- Daily tasks
+        CREATE TABLE IF NOT EXISTS tasks (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            date        TEXT    NOT NULL,           -- YYYY-MM-DD
+            title       TEXT    NOT NULL,
+            details     TEXT    NOT NULL DEFAULT '',
+            notes       TEXT    NOT NULL DEFAULT '',
+            status      TEXT    NOT NULL DEFAULT 'IN_PROGRESS'
+                            CHECK(status IN ('IN_PROGRESS','COMPLETED','BLOCKED')),
+            tags        TEXT    NOT NULL DEFAULT '', -- comma-separated
+            time_spent  REAL    NOT NULL DEFAULT 0, -- hours
+            created_at  TEXT    NOT NULL DEFAULT (datetime('now')),
+            updated_at  TEXT    NOT NULL DEFAULT (datetime('now'))
+        );
+
+        -- Application settings (key-value store)
+        CREATE TABLE IF NOT EXISTS app_settings (
+            key    TEXT PRIMARY KEY,
+            value  TEXT NOT NULL
+        );
+
+        -- Sticky notes
+        CREATE TABLE IF NOT EXISTS sticky_notes (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            title       TEXT    NOT NULL DEFAULT '',
+            content     TEXT    NOT NULL DEFAULT '',
+            color       TEXT    NOT NULL DEFAULT 'yellow'
+                            CHECK(color IN ('yellow','blue','green','pink','purple')),
+            pinned      INTEGER NOT NULL DEFAULT 0,
+            created_at  TEXT    NOT NULL DEFAULT (datetime('now')),
+            updated_at  TEXT    NOT NULL DEFAULT (datetime('now'))
+        );
+
         -- Indexes for fast date-range queries
-        CREATE INDEX IF NOT EXISTS idx_work_entries_date ON work_entries(date);
-        CREATE INDEX IF NOT EXISTS idx_holidays_date     ON holidays(date);
-        CREATE INDEX IF NOT EXISTS idx_leaves_range      ON leaves(start_date, end_date);
+        CREATE INDEX IF NOT EXISTS idx_work_entries_date    ON work_entries(date);
+        CREATE INDEX IF NOT EXISTS idx_holidays_date        ON holidays(date);
+        CREATE INDEX IF NOT EXISTS idx_leaves_range         ON leaves(start_date, end_date);
+        CREATE INDEX IF NOT EXISTS idx_tasks_date           ON tasks(date);
+        CREATE INDEX IF NOT EXISTS idx_sticky_notes_color   ON sticky_notes(color);
+        CREATE INDEX IF NOT EXISTS idx_sticky_notes_pinned  ON sticky_notes(pinned);
         ",
     )?;
 

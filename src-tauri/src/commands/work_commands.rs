@@ -18,7 +18,32 @@ pub(crate) fn resolve_day_status(
     let naive_date = NaiveDate::parse_from_str(date, "%Y-%m-%d")
         .map_err(|e| WorklyticsError::Validation(format!("Invalid date '{}': {}", date, e)))?;
 
-    let is_weekend = matches!(naive_date.weekday(), Weekday::Sat | Weekday::Sun);
+    // Read weekend-work settings to support configurable working weekends
+    let work_saturday: bool = conn
+        .query_row(
+            "SELECT value FROM app_settings WHERE key = 'work_saturday'",
+            [],
+            |row| row.get::<_, String>(0),
+        )
+        .optional()
+        .unwrap_or(None)
+        .map(|v| v == "true")
+        .unwrap_or(false);
+    let work_sunday: bool = conn
+        .query_row(
+            "SELECT value FROM app_settings WHERE key = 'work_sunday'",
+            [],
+            |row| row.get::<_, String>(0),
+        )
+        .optional()
+        .unwrap_or(None)
+        .map(|v| v == "true")
+        .unwrap_or(false);
+
+    let is_saturday = matches!(naive_date.weekday(), Weekday::Sat);
+    let is_sunday = matches!(naive_date.weekday(), Weekday::Sun);
+    // A day is treated as weekend only if it's Saturday/Sunday AND NOT configured as working
+    let is_weekend = (is_saturday && !work_saturday) || (is_sunday && !work_sunday);
 
     // 2. Check for an *approved* leave that covers this date
     let leave_row: Option<(String, String)> = conn

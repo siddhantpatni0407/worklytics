@@ -15,9 +15,9 @@ export default function StatsCard({ title, value, subtitle, color, bgColor, icon
         <span className={color}>{icon}</span>
       </div>
       <div className="min-w-0">
-        <p className="text-xs font-medium text-slate-500 truncate">{title}</p>
+        <p className="text-xs font-medium text-app-muted truncate">{title}</p>
         <p className={`text-2xl font-bold ${color} leading-none mt-0.5`}>{value}</p>
-        {subtitle && <p className="text-xs text-slate-400 mt-1">{subtitle}</p>}
+        {subtitle && <p className="text-xs text-app-muted mt-1">{subtitle}</p>}
         {trend && (
           <p className={`text-xs font-medium mt-1 ${trend.value >= 0 ? "text-emerald-600" : "text-red-500"}`}>
             {trend.value >= 0 ? "↑" : "↓"} {Math.abs(trend.value)}% {trend.label}
@@ -27,3 +27,4 @@ export default function StatsCard({ title, value, subtitle, color, bgColor, icon
     </div>
   );
 }
+

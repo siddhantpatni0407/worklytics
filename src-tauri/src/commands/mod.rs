@@ -1,5 +1,10 @@
 pub mod analytics_commands;
+pub mod db_commands;
+pub mod excel_commands;
 pub mod export_commands;
 pub mod holiday_commands;
 pub mod leave_commands;
+pub mod note_commands;
+pub mod settings_commands;
+pub mod task_commands;
 pub mod work_commands;

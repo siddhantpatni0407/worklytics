@@ -49,3 +49,14 @@ export function yearRange(centerYear: number, span = 5): number[] {
   for (let y = centerYear - span; y <= centerYear + span; y++) years.push(y);
   return years;
 }
+
+/** Build a year list from an explicit start–end range (used in Settings). */
+export function yearRangeFromBounds(start: number, end: number): number[] {
+  const years: number[] = [];
+  for (let y = start; y <= end; y++) years.push(y);
+  return years;
+}
+
+/** Format date as "Mon, 24 Apr 2026" */
+export const formatDisplayDateShort = (date: Date): string =>
+  format(date, "EEE, dd MMM yyyy");

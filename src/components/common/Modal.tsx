@@ -51,16 +51,17 @@ export default function Modal({
     >
       <div
         className={cn(
-          "relative w-full bg-white rounded-2xl shadow-2xl border border-slate-200 flex flex-col animate-scale-in",
+          "relative w-full rounded-2xl shadow-2xl flex flex-col animate-[scaleIn_0.2s_ease-out]",
+          "bg-[var(--bg-card)] border border-[var(--border-card)]",
           SIZE_CLASSES[size]
         )}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
-          <h2 className="text-base font-semibold text-slate-900">{title}</h2>
+        <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border-card)]">
+          <h2 className="text-base font-semibold text-app-primary">{title}</h2>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+            className="p-1.5 rounded-lg text-app-muted hover:text-app-primary hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
           >
             <X className="h-4 w-4" />
           </button>
@@ -71,7 +72,7 @@ export default function Modal({
 
         {/* Footer */}
         {footer && (
-          <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-slate-200">
+          <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-[var(--border-card)]">
             {footer}
           </div>
         )}
