@@ -28,6 +28,7 @@ package-lock.json
 target/
 Cargo.lock
 src-tauri/icons
+src-tauri/gen
 
 # Tauri build output
 src-tauri/target/
