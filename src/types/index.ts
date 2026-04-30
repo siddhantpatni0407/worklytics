@@ -139,7 +139,7 @@ export interface SetWorkEntryPayload {
 // Tasks
 // ---------------------------------------------------------------------------
 
-export type TaskStatus = "IN_PROGRESS" | "COMPLETED" | "BLOCKED";
+export type TaskStatus = "TODO" | "IN_PROGRESS" | "COMPLETED" | "BLOCKED";
 
 export interface Task {
   id: number;
@@ -147,7 +147,7 @@ export interface Task {
   title: string;
   details: string;
   notes: string;
-  status: TaskStatus;
+  status: string;
   tags: string;          // comma-separated
   timeSpent: number;     // hours
   createdAt: string;
@@ -159,7 +159,7 @@ export interface CreateTaskPayload {
   title: string;
   details?: string;
   notes?: string;
-  status?: TaskStatus;
+  status?: string;
   tags?: string;
   timeSpent?: number;
 }
@@ -170,34 +170,104 @@ export interface UpdateTaskPayload {
   title?: string;
   details?: string;
   notes?: string;
-  status?: TaskStatus;
+  status?: string;
   tags?: string;
   timeSpent?: number;
 }
+
+// ---------------------------------------------------------------------------
+// User Profile
+// ---------------------------------------------------------------------------
+
+export interface UserProfile {
+  name: string;
+  email: string;
+  role: string;
+  avatarInitials: string; // derived, not stored
+}
+
+export const DEFAULT_PROFILE: UserProfile = {
+  name: "",
+  email: "",
+  role: "",
+  avatarInitials: "",
+};
 
 // ---------------------------------------------------------------------------
 // App Settings
 // ---------------------------------------------------------------------------
 
 export type ThemeMode = "light" | "dark" | "system";
+export type ThemeAccentColor = "indigo" | "blue" | "violet" | "emerald" | "rose" | "amber";
+export type TaskViewMode = "list" | "kanban";
 
 export interface AppSettings {
   theme: ThemeMode;
+  accentColor: ThemeAccentColor;
   timezone: string;
   yearStart: number;
   yearEnd: number;
   workSaturday: boolean;
   workSunday: boolean;
+  // Task metadata configuration
+  sprints: string[];
+  projects: string[];
+  teams: string[];
+  customStatuses: string[];
+  // Developer / About info (stored in DB, configurable)
+  developerName: string;
+  developerEmail: string;
+  developerGithub: string;
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
   theme: "system",
+  accentColor: "indigo",
   timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "Asia/Kolkata",
   yearStart: 2020,
   yearEnd: 2050,
   workSaturday: false,
   workSunday: false,
+  sprints: [],
+  projects: [],
+  teams: [],
+  customStatuses: [],
+  developerName: "Siddhant Patni",
+  developerEmail: "",
+  developerGithub: "",
 };
+
+// ---------------------------------------------------------------------------
+// Task metadata helpers (stored as prefixed tags)
+// ---------------------------------------------------------------------------
+
+export function parseTaskMeta(tags: string): {
+  sprint: string; project: string; team: string; regularTags: string[];
+} {
+  const parts = tags ? tags.split(",").map((s) => s.trim()).filter(Boolean) : [];
+  let sprint = ""; let project = ""; let team = "";
+  const regularTags: string[] = [];
+  parts.forEach((p) => {
+    if (p.startsWith("sprint:"))  sprint  = p.slice(7).trim();
+    else if (p.startsWith("project:")) project = p.slice(8).trim();
+    else if (p.startsWith("team:"))   team    = p.slice(5).trim();
+    else regularTags.push(p);
+  });
+  return { sprint, project, team, regularTags };
+}
+
+export function buildTaskTags(
+  sprint: string, project: string, team: string, regularTags: string
+): string {
+  const parts: string[] = [];
+  if (sprint.trim())  parts.push(`sprint:${sprint.trim()}`);
+  if (project.trim()) parts.push(`project:${project.trim()}`);
+  if (team.trim())    parts.push(`team:${team.trim()}`);
+  if (regularTags.trim()) {
+    regularTags.split(",").map((t) => t.trim()).filter(Boolean).forEach((t) => parts.push(t));
+  }
+  return parts.join(",");
+}
 
 // ---------------------------------------------------------------------------
 // Sticky Notes

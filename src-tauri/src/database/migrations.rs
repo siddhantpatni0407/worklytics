@@ -48,8 +48,7 @@ pub fn run_migrations(conn: &Connection) -> Result<(), WorklyticsError> {
             title       TEXT    NOT NULL,
             details     TEXT    NOT NULL DEFAULT '',
             notes       TEXT    NOT NULL DEFAULT '',
-            status      TEXT    NOT NULL DEFAULT 'IN_PROGRESS'
-                            CHECK(status IN ('IN_PROGRESS','COMPLETED','BLOCKED')),
+            status      TEXT    NOT NULL DEFAULT 'TODO',
             tags        TEXT    NOT NULL DEFAULT '', -- comma-separated
             time_spent  REAL    NOT NULL DEFAULT 0, -- hours
             created_at  TEXT    NOT NULL DEFAULT (datetime('now')),
@@ -83,6 +82,44 @@ pub fn run_migrations(conn: &Connection) -> Result<(), WorklyticsError> {
         CREATE INDEX IF NOT EXISTS idx_sticky_notes_pinned  ON sticky_notes(pinned);
         ",
     )?;
+
+    // Migration v1 → v2: drop the CHECK constraint on tasks.status
+    // (SQLite can't DROP CONSTRAINT, so we recreate the table)
+    let user_version: i32 = conn.query_row("PRAGMA user_version", [], |r| r.get(0))?;
+    if user_version < 2 {
+        conn.execute_batch(
+            "PRAGMA foreign_keys = OFF;
+
+             BEGIN;
+
+             -- Rename old table
+             ALTER TABLE tasks RENAME TO tasks_old;
+
+             -- Create new table without CHECK constraint
+             CREATE TABLE tasks (
+                 id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                 date        TEXT    NOT NULL,
+                 title       TEXT    NOT NULL,
+                 details     TEXT    NOT NULL DEFAULT '',
+                 notes       TEXT    NOT NULL DEFAULT '',
+                 status      TEXT    NOT NULL DEFAULT 'TODO',
+                 tags        TEXT    NOT NULL DEFAULT '',
+                 time_spent  REAL    NOT NULL DEFAULT 0,
+                 created_at  TEXT    NOT NULL DEFAULT (datetime('now')),
+                 updated_at  TEXT    NOT NULL DEFAULT (datetime('now'))
+             );
+
+             -- Copy existing rows
+             INSERT INTO tasks SELECT * FROM tasks_old;
+
+             DROP TABLE tasks_old;
+
+             COMMIT;
+
+             PRAGMA foreign_keys = ON;
+             PRAGMA user_version = 2;",
+        )?;
+    }
 
     Ok(())
 }
