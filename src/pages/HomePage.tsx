@@ -147,7 +147,7 @@ export default function HomePage() {
   // Week range label
   const weekStart = startOfWeek(today, { weekStartsOn: 1 });
   const weekEnd   = endOfWeek(today,   { weekStartsOn: 1 });
-  const weekLabel = `${format(weekStart, "MMM d")} â€“ ${format(weekEnd, "MMM d")}`;
+  const weekLabel = `${format(weekStart, "MMM d")} – ${format(weekEnd, "MMM d")}`;
 
   // Greeting
   const hour     = today.getHours();
@@ -208,10 +208,10 @@ export default function HomePage() {
                 {format(today, "EEEE, MMMM d, yyyy")}
               </p>
               <h1 className="text-2xl font-extrabold text-app-primary leading-tight">
-                {greeting}{firstName ? `, ${firstName}` : ""}! ðŸ‘‹
+                {greeting}{firstName ? `, ${firstName}` : ""}! 👋
               </h1>
               <p className="text-sm text-app-secondary mt-1">
-                {format(today, "MMMM yyyy")} &nbsp;Â·&nbsp; Week {format(today, "w")} &nbsp;Â·&nbsp; {weekLabel}
+                {format(today, "MMMM yyyy")} &nbsp;·&nbsp; Week {format(today, "w")} &nbsp;·&nbsp; {weekLabel}
               </p>
             </div>
 
@@ -257,7 +257,7 @@ export default function HomePage() {
               {
                 icon: <Clock className="h-4 w-4 text-violet-500" />,
                 label: "Hours today",
-                value: hoursToday > 0 ? `${hoursToday}h` : "â€”",
+                value: hoursToday > 0 ? `${hoursToday}h` : "—",
                 color: "text-violet-600",
               },
             ].map(({ icon, label, value, color }) => (
@@ -299,7 +299,7 @@ export default function HomePage() {
           icon={<Activity className="h-4.5 w-4.5" />}
           label="Active Tasks"
           value={activeTasks}
-          sub={`${totalTasks} total Â· ${completedToday} done today`}
+          sub={`${totalTasks} total · ${completedToday} done today`}
           color="bg-violet-100 dark:bg-violet-900/30"
           iconColor="text-violet-600"
           onClick={() => navigate("/tasks")}
@@ -321,7 +321,7 @@ export default function HomePage() {
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
               <PieChart className="h-4 w-4 text-brand-500" />
-              <h3 className="text-sm font-bold text-app-primary">{selectedYear} â€” Work Distribution</h3>
+              <h3 className="text-sm font-bold text-app-primary">{selectedYear} — Work Distribution</h3>
               <span className="text-xs text-app-muted">
                 ({stats.daysLogged}/{stats.totalWorkingDays} days logged)
               </span>
@@ -464,7 +464,7 @@ export default function HomePage() {
                 <Zap className="h-9 w-9 text-app-muted mb-2 opacity-50" />
                 <p className="text-sm font-medium text-app-secondary">No tasks yet</p>
                 <button onClick={() => navigate("/tasks")} className="mt-2 text-xs text-brand-500 hover:text-brand-600 font-medium">
-                  Add your first task â†’
+                  Add your first task →
                 </button>
               </div>
             ) : (
@@ -532,7 +532,7 @@ export default function HomePage() {
                 <StickyNote className="h-9 w-9 text-app-muted mb-2 opacity-50" />
                 <p className="text-sm font-medium text-app-secondary">No notes yet</p>
                 <button onClick={() => navigate("/notes")} className="mt-2 text-xs text-brand-500 hover:text-brand-600 font-medium">
-                  Create a note â†’
+                  Create a note →
                 </button>
               </div>
             ) : (
