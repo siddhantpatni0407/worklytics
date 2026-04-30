@@ -22,7 +22,7 @@ Track your daily work mode (WFO, WFH, WFC), manage holidays and leaves, log dail
 12. [UI Overview](#ui-overview)
 13. [Tauri Commands Reference](#tauri-commands-reference)
 14. [Export Feature](#export-feature)
-15. [Contributing](#contributing)
+15. [License](#license)
 
 ---
 
@@ -44,7 +44,9 @@ Track your daily work mode (WFO, WFH, WFC), manage holidays and leaves, log dail
 
 | Feature | Description |
 |---|---|
-| ✅ **Daily Tasks** | Log daily task updates with title, details, notes, tags, status, and time spent |
+| 🏠 **Home Dashboard** | Quick-glance summary — stats cards, mini calendar strip, recent tasks and notes |
+| ✅ **Daily Tasks** | Log task updates with title, details, notes, tags, sprint, project, team, and time spent |
+| 🗂️ **Kanban Board** | Toggle between List and Kanban views; columns for TODO, In Progress, Blocked, Completed + custom statuses; click any card to open a slide-in **detail drawer** with full task info |
 | 🗒️ **Sticky Notes** | Coloured sticky notes (yellow, blue, green, pink, purple) with pin, search, and filter |
 | 📊 **Analytics Dashboard** | Monthly/yearly charts — bar, area, and pie charts with configurable year range |
 | 📤 **CSV Export** | Export monthly or yearly work-status data to CSV |
@@ -60,6 +62,11 @@ Track your daily work mode (WFO, WFH, WFC), manage holidays and leaves, log dail
 | 📅 **Configurable Year Range** | Set the calendar/analytics year range (e.g. 2020–2050) |
 | 🗄️ **Custom DB Location** | Choose where the SQLite database is stored; one-click migration |
 | 🗂️ **Collapsible Sidebar** | Sidebar collapses to icon-only mode to maximise screen space |
+| 🏷️ **Custom Task Statuses** | Define extra task statuses beyond the four built-in ones |
+| 🗃️ **Task Metadata** | Configure sprint, project, and team lists used as task dropdowns |
+| 🎨 **Accent Colour** | Choose from six accent colour palettes (indigo, blue, violet, emerald, rose, amber); colour change applies **live** across the entire UI instantly |
+| 👤 **User Profile** | Set your Display Name, Email, and Role; stored in SQLite; shown in sidebar, header avatar, and personalised home greeting |
+| 🧑‍💻 **Developer Info** | Configurable "Developed By" section in the About page (name, email, GitHub handle) |
 | 💾 **Offline-First** | All data lives in a local SQLite database — no internet required |
 | 🪟 **Windows EXE** | Packages as a native Windows installer (NSIS + WiX MSI) |
 
@@ -165,8 +172,8 @@ erDiagram
         TEXT    title
         TEXT    details
         TEXT    notes
-        TEXT    status      "IN_PROGRESS|COMPLETED|BLOCKED"
-        TEXT    tags        "comma-separated"
+        TEXT    status      "TODO|IN_PROGRESS|COMPLETED|BLOCKED|<custom>"
+        TEXT    tags        "sprint:X|project:Y|team:Z|tag1,tag2,..."
         REAL    time_spent  "hours"
         TEXT    created_at
         TEXT    updated_at
@@ -186,6 +193,8 @@ erDiagram
         TEXT    key   PK
         TEXT    value
     }
+
+> **Note:** The `tasks.tags` column encodes structured metadata using pipe-separated key:value prefixes — e.g. `sprint:Q2-2025|project:Alpha|team:Backend|bug,urgent`. The `status` column accepts any string; built-in values are `TODO`, `IN_PROGRESS`, `COMPLETED`, `BLOCKED`. Custom statuses defined in Settings are also valid.
 ```
 
 ---
@@ -263,9 +272,10 @@ worklytics/
 │   │   │   ├── YearlyTrendChart.tsx      # Area trend chart
 │   │   │   └── StatusDistributionChart.tsx
 │   │   ├── tasks/
-│   │   │   ├── TaskCard.tsx              # Expandable task card
-│   │   │   ├── TaskForm.tsx              # Add/edit task modal
-│   │   │   └── TaskFilters.tsx           # Search, status, tag, date-range filters
+│   │   │   ├── TaskCard.tsx              # Expandable task card (sprint/project/team chips, dynamic status colour, onSelect for Kanban)
+│   │   │   ├── TaskForm.tsx              # Add/edit task modal (sprint/project/team dropdowns, custom statuses)
+│   │   │   ├── TaskFilters.tsx           # Search, status, tag, sprint, project, team, date-range filters
+│   │   │   └── KanbanView.tsx            # Kanban board with dynamic columns + slide-in task detail drawer
 │   │   ├── notes/
 │   │   │   ├── NoteCard.tsx              # Coloured sticky note card
 │   │   │   └── NoteEditor.tsx            # Create/edit note modal
@@ -276,33 +286,36 @@ worklytics/
 │   │   │   ├── LeaveManager.tsx
 │   │   │   └── LeaveForm.tsx
 │   │   ├── layout/
-│   │   │   ├── Layout.tsx                # App shell + dark-mode class injection
-│   │   │   ├── Sidebar.tsx               # Collapsible grouped navigation
-│   │   │   └── Header.tsx                # Real-time clock + theme toggle
+│   │   │   ├── Layout.tsx                # App shell + dark-mode class injection + profile/settings load from DB on startup
+│   │   │   ├── Sidebar.tsx               # Collapsible navigation + bottom profile avatar card
+│   │   │   └── Header.tsx                # Real-time clock + theme toggle + user avatar pill (→ /profile)
 │   │   └── common/
 │   │       ├── Button.tsx
 │   │       ├── Modal.tsx
 │   │       ├── ConfirmDialog.tsx
 │   │       └── StatusBadge.tsx
 │   ├── pages/
+│   │   ├── HomePage.tsx                  # Enhanced dashboard: greeting, today status, year bar, quick actions, mini calendar, recent tasks/notes
 │   │   ├── CalendarPage.tsx
 │   │   ├── DashboardPage.tsx             # Includes Excel export
 │   │   ├── HolidaysPage.tsx
 │   │   ├── LeavesPage.tsx
-│   │   ├── TasksPage.tsx                 # Daily task tracking
+│   │   ├── TasksPage.tsx                 # Daily task tracking (list + kanban views, sprint/project/team filters)
 │   │   ├── NotesPage.tsx                 # Sticky notes
-│   │   └── SettingsPage.tsx              # Theme, timezone, year range, weekend, DB path
+│   │   ├── ProfilePage.tsx               # User profile editor (name, email, role; persisted to SQLite)
+│   │   ├── SettingsPage.tsx              # Theme (live accent preview), timezone, year range, weekend, custom statuses, metadata, DB path, About info
+│   │   └── AboutPage.tsx                 # App info, "Developed By" section, tech stack, architecture, status priority rules
 │   ├── store/
-│   │   └── appStore.ts                   # Zustand (persisted: year, month, settings, sidebar)
+│   │   └── appStore.ts                   # Zustand (persisted: year, month, settings, profile, sidebar, taskViewMode); exports computeInitials(), applyAccentColor()
 │   ├── types/
-│   │   └── index.ts                      # All TypeScript types + DEFAULT_SETTINGS
+│   │   └── index.ts                      # All TypeScript types + DEFAULT_SETTINGS + UserProfile + DEFAULT_PROFILE
 │   ├── utils/
 │   │   ├── tauriCommands.ts              # All invoke() wrappers
-│   │   ├── dateUtils.ts                  # Date helpers + yearRangeFromBounds
+│   │   ├── dateUtils.ts                  # Date helpers + yearRangeFromBounds + formatDisplayDate
 │   │   ├── excelExport.ts                # XLSX workbook builder
 │   │   └── cn.ts                         # Tailwind class merger
 │   ├── styles/
-│   │   └── globals.css                   # CSS custom properties (dark/light), component classes
+│   │   └── globals.css                   # Design tokens (--accent-*, --sidebar-*, --bg-*, --text-*), component classes (.wl-card, .wl-btn, .wl-input, sidebar-item), slideFromRight keyframe
 │   ├── App.tsx                           # Router setup
 │   └── main.tsx                          # React entry point
 │
@@ -583,11 +596,25 @@ npm run tauri build -- --bundles none
   - ⬜ Slate — Weekend (auto-detected)
   - ⬜ White — Unset weekday
 
+### Home (`/home`)
+- **Personalised greeting** — time-aware (Good morning / afternoon / evening) with user's first name
+- **Today's status badge** — contextual pill showing Working from Office / Home / Client / On Leave / Holiday
+- **Today at a glance strip** — completed today, blocked tasks, hours logged today
+- **Stats cards (4):** WFO days (with % bar), WFH days (with % bar), active tasks, sticky notes
+- **Year progress bar** — single segmented bar showing Office / Remote / Client / Leave / Holiday / Unlogged proportions for the selected year, with a 6-column legend
+- **Quick Actions row** — one-click shortcuts to Log Work Status, Add Task, New Note, and View Analytics
+- **Mini calendar** — colour-coded day cells; future dates stay neutral; today highlighted with ring
+- **Recent tasks** — formatted dates, strikethrough for completed, time-spent badge, Add Task shortcut
+- **Sticky notes** — top coloured bar per note, pin icon, New Note shortcut
+
 ### Tasks (`/tasks`)
 - Log daily work updates with title, details, notes, tags, and time spent (hours)
-- Task statuses: **In Progress**, **Completed**, **Blocked**
-- Filter by status, tag, date range, or free-text search
-- Tasks grouped by date, newest first
+- Task statuses: **TODO** (default), **In Progress**, **Completed**, **Blocked**, plus any custom statuses defined in Settings
+- **Kanban view:** Toggle between List and Kanban board; Kanban columns are generated automatically including custom status columns
+- **Kanban task detail drawer:** Click any card to open a slide-in right panel showing status, date, time logged, sprint/project/team chips, tags, details, and notes, with Edit and Delete actions
+- **Task metadata:** Assign a Sprint, Project, and Team to each task (configurable lists in Settings); encoded in the `tags` column
+- Filter by status, tag, sprint, project, team, date range, or free-text search
+- Tasks grouped by date, newest first in list view
 - Stats cards: Total, Completed, In Progress, Total Hours
 
 ### Sticky Notes (`/notes`)
@@ -616,13 +643,28 @@ npm run tauri build -- --bundles none
 - Status: Approved, Pending, Rejected
 
 ### Settings (`/settings`)
-- **Appearance** — Light / Dark / System theme
+- **Appearance** — Light / Dark / System theme + six accent colour palettes with **live preview**
 - **Timezone & Clock** — Display timezone for the header clock
 - **Calendar Year Range** — Configurable start/end year
 - **Database Configuration** — View current DB path, browse to change it, migrate data, reset to default
 - **Weekend Work** — Toggle Saturday and/or Sunday as working days
-- **Status Priority Rules** — Visual explanation
-- **About** — App and tech stack info
+- **Task Statuses** — View built-in statuses (read-only) and add/remove custom statuses
+- **Task Metadata** — Manage Sprint, Project, and Team chip lists used as task form dropdowns
+- **About Info** — Configurable developer name, email, and GitHub handle shown in the About page
+
+### Profile (`/profile`)
+- Edit **Display Name**, **Email**, and **Role / Designation**
+- Live avatar preview with auto-computed initials
+- Saves to SQLite via `app_settings` key-value store (`profile_name`, `profile_email`, `profile_role`)
+- Profile data is shown in the **sidebar avatar card**, **header pill**, and **home greeting**
+
+### About (`/about`)
+- App version and description
+- **"Developed By" section** — developer name, role, email and GitHub link (configurable in Settings › About Info)
+- Full feature list
+- Status priority rules diagram
+- Expandable technology stack (Frontend / Backend / Database)
+- Architecture layer diagram
 
 ---
 
@@ -709,6 +751,24 @@ All commands are in `src-tauri/src/commands/` and registered in `lib.rs`.
 | `cmd_set_setting` | `key: String, value: String` | `void` |
 | `cmd_set_settings_batch` | `settings: (String, String)[]` | `void` |
 
+**Known `app_settings` keys:**
+
+| Key | Type | Description |
+|---|---|---|
+| `theme` | `light` \| `dark` \| `system` | UI theme |
+| `accent_color` | `indigo` \| `blue` \| `violet` \| `emerald` \| `rose` \| `amber` | Accent colour palette |
+| `timezone` | IANA tz string | Header clock timezone |
+| `year_start` / `year_end` | integer | Calendar year range |
+| `work_saturday` / `work_sunday` | `true` \| `false` | Weekend-as-workday overrides |
+| `custom_statuses` | JSON array | Extra task status strings |
+| `sprints` / `projects` / `teams` | JSON arrays | Task metadata chip lists |
+| `profile_name` | string | User's display name |
+| `profile_email` | string | User's email address |
+| `profile_role` | string | User's role / designation |
+| `developer_name` | string | "Developed By" name in About page |
+| `developer_email` | string | Developer email in About page |
+| `developer_github` | string | Developer GitHub handle in About page |
+
 ### Database Configuration Commands
 
 | Command | Parameters | Returns |
@@ -756,6 +816,7 @@ Export is triggered from the **Analytics Dashboard** page.
 ```mermaid
 graph LR
     subgraph Pages
+        HOME[HomePage]
         CP[CalendarPage]
         DP[DashboardPage]
         HP[HolidaysPage]
@@ -763,6 +824,8 @@ graph LR
         TP[TasksPage]
         NP[NotesPage]
         SP[SettingsPage]
+        AP[AboutPage]
+        PP[ProfilePage]
     end
 
     subgraph Components
@@ -772,6 +835,7 @@ graph LR
         TCard[TaskCard]
         TForm[TaskForm]
         TFilters[TaskFilters]
+        KV[KanbanView]
         NCard[NoteCard]
         NEditor[NoteEditor]
         HM[HolidayManager]
@@ -788,12 +852,15 @@ graph LR
         TC[tauriCommands.ts]
     end
 
+    HOME --> TC
+    PP[ProfilePage] --> TC
     CP --> CV --> CC
     CV --> WSM
     DP --> TC
     TP --> TCard
     TP --> TForm
     TP --> TFilters
+    TP --> KV
     NP --> NCard
     NP --> NEditor
     HP --> HM
@@ -815,3 +882,7 @@ graph LR
 ## License
 
 SP © Worklytics Contributors
+
+---
+
+*Last updated: April 2026*

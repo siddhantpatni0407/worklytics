@@ -72,19 +72,6 @@ pub fn cmd_get_all_tasks(db: State<DbState>) -> Result<Vec<Task>, WorklyticsErro
 /// Add a new task.
 #[tauri::command]
 pub fn cmd_add_task(task: CreateTask, db: State<DbState>) -> Result<Task, WorklyticsError> {
-    // Validate status if provided
-    if let Some(ref s) = task.status {
-        match s.as_str() {
-            "IN_PROGRESS" | "COMPLETED" | "BLOCKED" => {}
-            other => {
-                return Err(WorklyticsError::Validation(format!(
-                    "Invalid task status '{}'",
-                    other
-                )))
-            }
-        }
-    }
-
     let conn = db.0.lock().map_err(|e| WorklyticsError::Database(e.to_string()))?;
     conn.execute(
         "INSERT INTO tasks (date, title, details, notes, status, tags, time_spent)
@@ -94,7 +81,7 @@ pub fn cmd_add_task(task: CreateTask, db: State<DbState>) -> Result<Task, Workly
             task.title,
             task.details.unwrap_or_default(),
             task.notes.unwrap_or_default(),
-            task.status.unwrap_or_else(|| "IN_PROGRESS".to_string()),
+            task.status.unwrap_or_else(|| "TODO".to_string()),
             task.tags.unwrap_or_default(),
             task.time_spent.unwrap_or(0.0),
         ],

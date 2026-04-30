@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
 import {
-  Info, Monitor, Activity, Code2, Sun, Moon, Globe, Calendar,
-  ToggleLeft, ToggleRight, Save, RefreshCw, Database, FolderOpen,
-  RotateCcw, CheckCircle,
+  Monitor, Sun, Moon, Globe, Calendar,
+  ToggleLeft, Save, RefreshCw, Database, FolderOpen,
+  RotateCcw, CheckCircle, Palette, Layers, Briefcase, Users,
+  Plus, X, ListTodo, Info, User, Mail, Github,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { useAppStore } from "@/store/appStore";
@@ -10,24 +11,9 @@ import {
   setSettingsBatch, getDbPath, getDefaultDbPath, isCustomDbPath,
   selectDbDirectory, migrateDb, resetDbPath,
 } from "@/utils/tauriCommands";
-import type { ThemeMode, DbPathInfo } from "@/types";
+import type { ThemeMode, DbPathInfo, ThemeAccentColor } from "@/types";
 import { cn } from "@/utils/cn";
-
-const INFO_ROWS = [
-  { label: "Application",   value: "Worklytics v2.0.0"             },
-  { label: "Frontend",      value: "React 18 + TypeScript + Vite"  },
-  { label: "Backend",       value: "Rust + Tauri 2"                },
-  { label: "Database",      value: "SQLite (bundled via rusqlite)"  },
-  { label: "Storage",       value: "Local — 100% offline"          },
-];
-
-const STATUS_RULES = [
-  { priority: 1, status: "Leave",      color: "bg-amber-500",  desc: "Overrides everything. Approved leave on any day." },
-  { priority: 2, status: "Holiday",    color: "bg-red-500",    desc: "Overrides work status but not Leave."             },
-  { priority: 3, status: "WFO/WFH/WFC", color: "bg-blue-500", desc: "Manual work status. Overrides Weekend/Unset."    },
-  { priority: 4, status: "Weekend",    color: "bg-slate-400",  desc: "Auto-detected Saturday & Sunday (if not overridden)." },
-  { priority: 5, status: "Unset",      color: "bg-gray-300",   desc: "Weekday with no status set."                    },
-];
+import { ACCENT_COLORS, applyAccentColor } from "@/store/appStore";
 
 const TIMEZONES = [
   "Asia/Kolkata", "UTC", "America/New_York", "America/Chicago",
@@ -82,6 +68,17 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false);
   const [localSettings, setLocalSettings] = useState({ ...settings });
 
+  // Metadata list states (sprints, projects, teams)
+  const [newSprint, setNewSprint]   = useState("");
+  const [newProject, setNewProject] = useState("");
+  const [newTeam, setNewTeam]       = useState("");
+  const [newStatus, setNewStatus]   = useState("");
+
+  // Developer / About info
+  const [devName,   setDevName]   = useState(localSettings.developerName   ?? "Siddhant Patni");
+  const [devEmail,  setDevEmail]  = useState(localSettings.developerEmail  ?? "");
+  const [devGithub, setDevGithub] = useState(localSettings.developerGithub ?? "");
+
   // Database path state
   const [dbInfo, setDbInfo] = useState<DbPathInfo | null>(null);
   const [pendingDbPath, setPendingDbPath] = useState<string | null>(null);
@@ -90,19 +87,13 @@ export default function SettingsPage() {
   const loadDbInfo = async () => {
     try {
       const [currentPath, defaultPath, isCustom] = await Promise.all([
-        getDbPath(),
-        getDefaultDbPath(),
-        isCustomDbPath(),
+        getDbPath(), getDefaultDbPath(), isCustomDbPath(),
       ]);
       setDbInfo({ currentPath, defaultPath, isCustom });
-    } catch {
-      // Non-critical; silently ignore
-    }
+    } catch { /* Non-critical */ }
   };
 
   useEffect(() => { loadDbInfo(); }, []);
-
-  // Sync local copy when settings change externally
   useEffect(() => { setLocalSettings({ ...settings }); }, [settings]);
 
   const handleBrowseDb = async () => {
@@ -153,15 +144,23 @@ export default function SettingsPage() {
     try {
       // Persist to SQLite
       await setSettingsBatch([
-        ["theme",          localSettings.theme],
-        ["timezone",       localSettings.timezone],
-        ["year_start",     String(localSettings.yearStart)],
-        ["year_end",       String(localSettings.yearEnd)],
-        ["work_saturday",  String(localSettings.workSaturday)],
-        ["work_sunday",    String(localSettings.workSunday)],
+        ["theme",            localSettings.theme],
+        ["timezone",         localSettings.timezone],
+        ["year_start",       String(localSettings.yearStart)],
+        ["year_end",         String(localSettings.yearEnd)],
+        ["work_saturday",    String(localSettings.workSaturday)],
+        ["work_sunday",      String(localSettings.workSunday)],
+        ["accent_color",     localSettings.accentColor ?? "indigo"],
+        ["sprints",          JSON.stringify(localSettings.sprints ?? [])],
+        ["projects",         JSON.stringify(localSettings.projects ?? [])],
+        ["teams",            JSON.stringify(localSettings.teams ?? [])],
+        ["custom_statuses",  JSON.stringify(localSettings.customStatuses ?? [])],
+        ["developer_name",   devName.trim()],
+        ["developer_email",  devEmail.trim()],
+        ["developer_github", devGithub.trim()],
       ]);
       // Apply to store (triggers re-renders)
-      updateSettings(localSettings);
+      updateSettings({ ...localSettings, developerName: devName.trim(), developerEmail: devEmail.trim(), developerGithub: devGithub.trim() });
       triggerCalendarRefresh();
       triggerAnalyticsRefresh();
       toast.success("Settings saved");
@@ -182,8 +181,8 @@ export default function SettingsPage() {
     <div className="space-y-6 max-w-2xl">
       <div className="page-header">
         <div>
-          <h2 className="page-title">Settings & About</h2>
-          <p className="page-subtitle">Configure application behaviour and view system info</p>
+          <h2 className="page-title">Settings</h2>
+          <p className="page-subtitle">Configure application behaviour</p>
         </div>
         <button
           onClick={handleSave}
@@ -201,23 +200,59 @@ export default function SettingsPage() {
 
       {/* Theme */}
       <SectionCard icon={<Sun className="h-4 w-4" />} title="Appearance">
-        <div className="px-5 py-4">
-          <label className="wl-label">Theme</label>
-          <div className="flex gap-2 mt-1">
-            {THEME_OPTIONS.map(({ value, label, icon }) => (
-              <button
-                key={value}
-                onClick={() => setLocalSettings((s) => ({ ...s, theme: value }))}
-                className={cn(
-                  "flex items-center gap-2 px-4 py-2 rounded-lg border text-sm font-medium transition-all",
-                  localSettings.theme === value
-                    ? "border-brand-500 bg-brand-50 dark:bg-brand-900/20 text-brand-700 dark:text-brand-400"
-                    : "border-[var(--border-card)] text-app-secondary hover:border-brand-400"
-                )}
-              >
-                {icon} {label}
-              </button>
-            ))}
+        <div className="px-5 py-4 space-y-4">
+          <div>
+            <label className="wl-label">Theme</label>
+            <div className="flex gap-2 mt-1">
+              {THEME_OPTIONS.map(({ value, label, icon }) => (
+                <button
+                  key={value}
+                  onClick={() => setLocalSettings((s) => ({ ...s, theme: value }))}
+                  className={cn(
+                    "flex items-center gap-2 px-4 py-2 rounded-lg border text-sm font-medium transition-all",
+                    localSettings.theme === value
+                      ? "border-brand-500 bg-brand-50 dark:bg-brand-900/20 text-brand-700 dark:text-brand-400"
+                      : "border-[var(--border-card)] text-app-secondary hover:border-brand-400"
+                  )}
+                >
+                  {icon} {label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Accent color */}
+          <div>
+            <label className="wl-label flex items-center gap-1.5">
+              <Palette className="h-3.5 w-3.5" /> Accent Color
+            </label>
+            <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+              {(Object.keys(ACCENT_COLORS) as ThemeAccentColor[]).map((c) => {
+                const hex = ACCENT_COLORS[c]["500"];
+                const isSelected = (localSettings.accentColor ?? "indigo") === c;
+                return (
+                  <button
+                    key={c}
+                    onClick={() => {
+                    setLocalSettings((s) => ({ ...s, accentColor: c }));
+                    applyAccentColor(c); // live preview
+                  }}
+                    title={c}
+                    className={cn(
+                      "flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs font-semibold capitalize transition-all",
+                      isSelected
+                        ? "border-current text-white shadow-md scale-105"
+                        : "border-[var(--border-card)] text-app-secondary hover:scale-105"
+                    )}
+                    style={isSelected ? { backgroundColor: hex, borderColor: hex } : {}}
+                  >
+                    <span className="h-3 w-3 rounded-full" style={{ backgroundColor: hex }} />
+                    {c}
+                  </button>
+                );
+              })}
+            </div>
+            <p className="text-xs text-app-muted mt-2">Changes sidebar highlights, buttons, and interactive elements.</p>
           </div>
         </div>
       </SectionCard>
@@ -270,6 +305,139 @@ export default function SettingsPage() {
         <p className="px-5 pb-4 text-xs text-app-muted">
           The year dropdowns in Calendar and Analytics will show years in this range. Default: 2020–2050.
         </p>
+      </SectionCard>
+
+      {/* Task Statuses */}
+      <SectionCard icon={<ListTodo className="h-4 w-4" />} title="Task Statuses">
+        <div className="px-5 py-4 space-y-4">
+          <div>
+            <p className="wl-label mb-2">Built-in (always available)</p>
+            <div className="flex flex-wrap gap-1.5">
+              {[
+                { label: "To Do",       cls: "bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-600" },
+                { label: "In Progress", cls: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 border-blue-200 dark:border-blue-800" },
+                { label: "Completed",   cls: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800" },
+                { label: "Blocked",     cls: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300 border-red-200 dark:border-red-800" },
+              ].map(({ label, cls }) => (
+                <span key={label} className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${cls}`}>{label}</span>
+              ))}
+            </div>
+          </div>
+          <div>
+            <p className="wl-label mb-2">Custom Statuses</p>
+            <div className="flex flex-wrap gap-1.5 mb-2">
+              {(localSettings.customStatuses ?? []).map((s) => (
+                <span key={s} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300 border border-violet-200 dark:border-violet-800">
+                  {s}
+                  <button onClick={() => setLocalSettings((st) => ({ ...st, customStatuses: (st.customStatuses ?? []).filter((x) => x !== s) }))} className="hover:text-red-500">
+                    <X className="h-2.5 w-2.5" />
+                  </button>
+                </span>
+              ))}
+              {(localSettings.customStatuses ?? []).length === 0 && <span className="text-xs text-app-muted">No custom statuses</span>}
+            </div>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={newStatus}
+                onChange={(e) => setNewStatus(e.target.value)}
+                placeholder="e.g. REVIEW or TESTING"
+                className="wl-input flex-1"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && newStatus.trim()) {
+                    setLocalSettings((s) => ({ ...s, customStatuses: [...(s.customStatuses ?? []), newStatus.trim().toUpperCase().replace(/\s+/g, "_")] }));
+                    setNewStatus("");
+                    e.preventDefault();
+                  }
+                }}
+              />
+              <button
+                onClick={() => {
+                  if (newStatus.trim()) {
+                    setLocalSettings((s) => ({ ...s, customStatuses: [...(s.customStatuses ?? []), newStatus.trim().toUpperCase().replace(/\s+/g, "_")] }));
+                    setNewStatus("");
+                  }
+                }}
+                className="flex items-center gap-1 px-3 py-1.5 rounded-lg border border-[var(--border-card)] text-sm hover:border-brand-400 transition-colors"
+              >
+                <Plus className="h-3.5 w-3.5" /> Add
+              </button>
+            </div>
+            <p className="text-xs text-app-muted mt-2">Status names are auto-uppercased and spaces replaced with underscores (e.g. "In Review" → IN_REVIEW). Save settings to apply.</p>
+          </div>
+        </div>
+      </SectionCard>
+
+      {/* Task Metadata */}
+      <SectionCard icon={<Layers className="h-4 w-4" />} title="Task Metadata">
+        <div className="px-5 py-4 space-y-5">
+          {/* Sprints */}
+          <div>
+            <label className="wl-label flex items-center gap-1.5">
+              <Layers className="h-3 w-3 text-indigo-500" /> Sprints
+            </label>
+            <div className="flex flex-wrap gap-1.5 mt-1.5 mb-2">
+              {(localSettings.sprints ?? []).map((s) => (
+                <span key={s} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+                  {s}
+                  <button onClick={() => setLocalSettings((st) => ({ ...st, sprints: st.sprints.filter((x) => x !== s) }))} className="hover:text-red-500">
+                    <X className="h-2.5 w-2.5" />
+                  </button>
+                </span>
+              ))}
+              {(localSettings.sprints ?? []).length === 0 && <span className="text-xs text-app-muted">No sprints configured</span>}
+            </div>
+            <div className="flex gap-2">
+              <input type="text" value={newSprint} onChange={(e) => setNewSprint(e.target.value)} placeholder="e.g. Sprint 5" className="wl-input flex-1" onKeyDown={(e) => { if (e.key === "Enter" && newSprint.trim()) { setLocalSettings((s) => ({ ...s, sprints: [...(s.sprints ?? []), newSprint.trim()] })); setNewSprint(""); e.preventDefault(); } }} />
+              <button onClick={() => { if (newSprint.trim()) { setLocalSettings((s) => ({ ...s, sprints: [...(s.sprints ?? []), newSprint.trim()] })); setNewSprint(""); } }} className="flex items-center gap-1 px-3 py-1.5 rounded-lg border border-[var(--border-card)] text-sm hover:border-brand-400 transition-colors"><Plus className="h-3.5 w-3.5" /> Add</button>
+            </div>
+          </div>
+
+          {/* Projects */}
+          <div>
+            <label className="wl-label flex items-center gap-1.5">
+              <Briefcase className="h-3 w-3 text-teal-500" /> Projects
+            </label>
+            <div className="flex flex-wrap gap-1.5 mt-1.5 mb-2">
+              {(localSettings.projects ?? []).map((p) => (
+                <span key={p} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300 border border-teal-200 dark:border-teal-800">
+                  {p}
+                  <button onClick={() => setLocalSettings((st) => ({ ...st, projects: st.projects.filter((x) => x !== p) }))} className="hover:text-red-500">
+                    <X className="h-2.5 w-2.5" />
+                  </button>
+                </span>
+              ))}
+              {(localSettings.projects ?? []).length === 0 && <span className="text-xs text-app-muted">No projects configured</span>}
+            </div>
+            <div className="flex gap-2">
+              <input type="text" value={newProject} onChange={(e) => setNewProject(e.target.value)} placeholder="e.g. Phoenix" className="wl-input flex-1" onKeyDown={(e) => { if (e.key === "Enter" && newProject.trim()) { setLocalSettings((s) => ({ ...s, projects: [...(s.projects ?? []), newProject.trim()] })); setNewProject(""); e.preventDefault(); } }} />
+              <button onClick={() => { if (newProject.trim()) { setLocalSettings((s) => ({ ...s, projects: [...(s.projects ?? []), newProject.trim()] })); setNewProject(""); } }} className="flex items-center gap-1 px-3 py-1.5 rounded-lg border border-[var(--border-card)] text-sm hover:border-brand-400 transition-colors"><Plus className="h-3.5 w-3.5" /> Add</button>
+            </div>
+          </div>
+
+          {/* Teams */}
+          <div>
+            <label className="wl-label flex items-center gap-1.5">
+              <Users className="h-3 w-3 text-orange-500" /> Teams
+            </label>
+            <div className="flex flex-wrap gap-1.5 mt-1.5 mb-2">
+              {(localSettings.teams ?? []).map((t) => (
+                <span key={t} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300 border border-orange-200 dark:border-orange-800">
+                  {t}
+                  <button onClick={() => setLocalSettings((st) => ({ ...st, teams: st.teams.filter((x) => x !== t) }))} className="hover:text-red-500">
+                    <X className="h-2.5 w-2.5" />
+                  </button>
+                </span>
+              ))}
+              {(localSettings.teams ?? []).length === 0 && <span className="text-xs text-app-muted">No teams configured</span>}
+            </div>
+            <div className="flex gap-2">
+              <input type="text" value={newTeam} onChange={(e) => setNewTeam(e.target.value)} placeholder="e.g. Platform" className="wl-input flex-1" onKeyDown={(e) => { if (e.key === "Enter" && newTeam.trim()) { setLocalSettings((s) => ({ ...s, teams: [...(s.teams ?? []), newTeam.trim()] })); setNewTeam(""); e.preventDefault(); } }} />
+              <button onClick={() => { if (newTeam.trim()) { setLocalSettings((s) => ({ ...s, teams: [...(s.teams ?? []), newTeam.trim()] })); setNewTeam(""); } }} className="flex items-center gap-1 px-3 py-1.5 rounded-lg border border-[var(--border-card)] text-sm hover:border-brand-400 transition-colors"><Plus className="h-3.5 w-3.5" /> Add</button>
+            </div>
+          </div>
+          <p className="text-xs text-app-muted">These will appear as dropdowns in the Add/Edit Task form.</p>
+        </div>
       </SectionCard>
 
       {/* Database Configuration */}
@@ -350,6 +518,27 @@ export default function SettingsPage() {
         </div>
       </SectionCard>
 
+      {/* About / Developer Info */}
+      <SectionCard icon={<Info className="h-4 w-4" />} title="About Info">
+        <div className="px-5 py-4 space-y-4">
+          <p className="text-xs text-app-muted leading-relaxed">
+            These values appear in the <strong>About page</strong> under "Developed By". Stored locally in SQLite.
+          </p>
+          <div>
+            <label className="wl-label flex items-center gap-1.5"><User className="h-3 w-3" /> Developer Name</label>
+            <input type="text" value={devName} onChange={(e) => setDevName(e.target.value)} placeholder="e.g. Siddhant Patni" className="wl-input" maxLength={100} />
+          </div>
+          <div>
+            <label className="wl-label flex items-center gap-1.5"><Mail className="h-3 w-3" /> Developer Email (optional)</label>
+            <input type="email" value={devEmail} onChange={(e) => setDevEmail(e.target.value)} placeholder="e.g. user@example.com" className="wl-input" maxLength={120} />
+          </div>
+          <div>
+            <label className="wl-label flex items-center gap-1.5"><Github className="h-3 w-3" /> GitHub Handle (optional)</label>
+            <input type="text" value={devGithub} onChange={(e) => setDevGithub(e.target.value)} placeholder="e.g. github.com/username" className="wl-input" maxLength={150} />
+          </div>
+        </div>
+      </SectionCard>
+
       {/* Weekend work */}
       <SectionCard icon={<ToggleLeft className="h-4 w-4" />} title="Weekend Work">
         <Toggle
@@ -366,59 +555,7 @@ export default function SettingsPage() {
         />
       </SectionCard>
 
-      {/* Priority rules */}
-      <SectionCard icon={<Activity className="h-4 w-4" />} title="Status Priority Rules">
-        <div className="divide-y divide-[var(--border-card)]">
-          {STATUS_RULES.map((r) => (
-            <div key={r.priority} className="flex items-center gap-4 px-5 py-3">
-              <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-700 text-xs font-bold text-app-muted">
-                {r.priority}
-              </span>
-              <div className="flex items-center gap-2 min-w-[120px]">
-                <span className={`h-3 w-3 rounded-sm ${r.color}`} />
-                <span className="text-sm font-medium text-app-primary">{r.status}</span>
-              </div>
-              <span className="text-sm text-app-secondary">{r.desc}</span>
-            </div>
-          ))}
-        </div>
-      </SectionCard>
 
-      {/* About */}
-      <SectionCard icon={<Info className="h-4 w-4" />} title="About Worklytics">
-        <div className="divide-y divide-[var(--border-card)]">
-          {INFO_ROWS.map(({ label, value }) => (
-            <div key={label} className="flex items-center justify-between px-5 py-3">
-              <span className="text-sm text-app-muted">{label}</span>
-              <span className="text-sm font-medium text-app-primary">{value}</span>
-            </div>
-          ))}
-        </div>
-      </SectionCard>
-
-      {/* Tech stack */}
-      <SectionCard icon={<Code2 className="h-4 w-4" />} title="Technology Stack">
-        <div className="px-5 py-4 grid grid-cols-2 gap-3">
-          {[
-            { name: "React 18",     desc: "Frontend UI"            },
-            { name: "TypeScript",   desc: "Type-safe JavaScript"   },
-            { name: "Tauri 2",      desc: "Desktop runtime"        },
-            { name: "Rust",         desc: "Backend & commands"     },
-            { name: "SQLite",       desc: "Local database"         },
-            { name: "Tailwind CSS", desc: "Utility-first styling"  },
-            { name: "Recharts",     desc: "Analytics charts"       },
-            { name: "Zustand",      desc: "State management"       },
-          ].map(({ name, desc }) => (
-            <div key={name} className="flex items-center gap-3 rounded-lg border border-[var(--border-card)] px-3 py-2">
-              <div className="h-2 w-2 rounded-full bg-brand-400 flex-shrink-0" />
-              <div>
-                <p className="text-xs font-semibold text-app-primary">{name}</p>
-                <p className="text-[11px] text-app-muted">{desc}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-      </SectionCard>
     </div>
   );
 }

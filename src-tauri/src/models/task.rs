@@ -8,7 +8,7 @@ pub struct Task {
     pub title: String,
     pub details: String,
     pub notes: String,
-    pub status: String,     // "IN_PROGRESS" | "COMPLETED" | "BLOCKED"
+    pub status: String,     // any string, e.g. "TODO" | "IN_PROGRESS" | "COMPLETED" | "BLOCKED" | custom
     pub tags: String,       // comma-separated
     pub time_spent: f64,    // hours
     pub created_at: String,

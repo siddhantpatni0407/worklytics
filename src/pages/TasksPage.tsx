@@ -1,19 +1,22 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { Plus, RefreshCw, ListTodo, CheckSquare, Clock, AlertCircle } from "lucide-react";
+import { Plus, RefreshCw, ListTodo, CheckSquare, Clock, AlertCircle, LayoutGrid, List } from "lucide-react";
 import toast from "react-hot-toast";
 import { getAllTasks, addTask, updateTask, deleteTask } from "@/utils/tauriCommands";
 import { useAppStore } from "@/store/appStore";
 import type { Task, CreateTaskPayload, UpdateTaskPayload } from "@/types";
+import { parseTaskMeta } from "@/types";
 import Modal from "@/components/common/Modal";
 import ConfirmDialog from "@/components/common/ConfirmDialog";
 import TaskCard from "@/components/tasks/TaskCard";
 import TaskForm from "@/components/tasks/TaskForm";
+import KanbanView from "@/components/tasks/KanbanView";
 import TaskFilters, {
   DEFAULT_FILTERS,
   type TaskFiltersState,
   type TaskPeriod,
 } from "@/components/tasks/TaskFilters";
 import { todayISO, formatDateISO } from "@/utils/dateUtils";
+import { cn } from "@/utils/cn";
 import {
   startOfWeek, endOfWeek, startOfMonth, endOfMonth,
   startOfYear, endOfYear,
@@ -48,7 +51,7 @@ function resolvePeriodRange(period: TaskPeriod, customFrom: string, customTo: st
 }
 
 export default function TasksPage() {
-  const { tasksRefreshKey, triggerTasksRefresh } = useAppStore();
+  const { tasksRefreshKey, triggerTasksRefresh, taskViewMode, setTaskViewMode, settings } = useAppStore();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -79,14 +82,27 @@ export default function TasksPage() {
     [filters.period, filters.dateFrom, filters.dateTo]
   );
 
-  // ── All unique tags ───────────────────────────────────────────────────────
-  const allTags = useMemo(() => {
-    const set = new Set<string>();
+  // ── All unique sprints / projects / teams / tags ─────────────────────────
+  const { allSprints, allProjects, allTeams, allTags } = useMemo(() => {
+    const sprints  = new Set<string>(settings.sprints  ?? []);
+    const projects = new Set<string>(settings.projects ?? []);
+    const teams    = new Set<string>(settings.teams    ?? []);
+    const tags     = new Set<string>();
     tasks.forEach((t) => {
-      if (t.tags) t.tags.split(",").forEach((tag) => { const s = tag.trim(); if (s) set.add(s); });
+      if (!t.tags) return;
+      const { sprint, project, team, regularTags } = parseTaskMeta(t.tags);
+      if (sprint)  sprints.add(sprint);
+      if (project) projects.add(project);
+      if (team)    teams.add(team);
+      regularTags.forEach((tag) => tags.add(tag));
     });
-    return Array.from(set).sort();
-  }, [tasks]);
+    return {
+      allSprints:  Array.from(sprints).sort(),
+      allProjects: Array.from(projects).sort(),
+      allTeams:    Array.from(teams).sort(),
+      allTags:     Array.from(tags).sort(),
+    };
+  }, [tasks, settings.sprints, settings.projects, settings.teams]);
 
   // ── Filtered tasks ────────────────────────────────────────────────────────
   const filtered = useMemo(() => {
@@ -105,10 +121,13 @@ export default function TasksPage() {
           !t.notes.toLowerCase().includes(q)
         ) return false;
       }
-      // Tag
-      if (filters.tag) {
-        const tags = t.tags.split(",").map((s) => s.trim());
-        if (!tags.includes(filters.tag)) return false;
+      // Sprint / Project / Team / Tag — parsed from tags column
+      if (filters.sprint || filters.project || filters.team || filters.tag) {
+        const { sprint, project, team, regularTags } = parseTaskMeta(t.tags);
+        if (filters.sprint  && sprint  !== filters.sprint)            return false;
+        if (filters.project && project !== filters.project)          return false;
+        if (filters.team    && team    !== filters.team)              return false;
+        if (filters.tag     && !regularTags.includes(filters.tag))   return false;
       }
       return true;
     });
@@ -166,6 +185,33 @@ export default function TasksPage() {
           <p className="page-subtitle">Track your work items and productivity</p>
         </div>
         <div className="flex items-center gap-2">
+          {/* View toggle */}
+          <div className="flex items-center rounded-lg border border-[var(--border-card)] overflow-hidden">
+            <button
+              onClick={() => setTaskViewMode("list")}
+              className={cn(
+                "flex items-center gap-1.5 px-3 py-1.5 text-sm transition-colors",
+                taskViewMode === "list"
+                  ? "bg-brand-600 text-white"
+                  : "text-app-secondary hover:text-app-primary hover:bg-slate-100 dark:hover:bg-slate-700"
+              )}
+              title="List view"
+            >
+              <List className="h-3.5 w-3.5" />
+            </button>
+            <button
+              onClick={() => setTaskViewMode("kanban")}
+              className={cn(
+                "flex items-center gap-1.5 px-3 py-1.5 text-sm transition-colors",
+                taskViewMode === "kanban"
+                  ? "bg-brand-600 text-white"
+                  : "text-app-secondary hover:text-app-primary hover:bg-slate-100 dark:hover:bg-slate-700"
+              )}
+              title="Kanban view"
+            >
+              <LayoutGrid className="h-3.5 w-3.5" />
+            </button>
+          </div>
           <button
             onClick={fetchTasks}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm text-app-secondary
@@ -187,6 +233,9 @@ export default function TasksPage() {
       <TaskFilters
         filters={filters}
         allTags={allTags}
+        allSprints={allSprints}
+        allProjects={allProjects}
+        allTeams={allTeams}
         resolvedFrom={resolvedFrom}
         resolvedTo={resolvedTo}
         onChange={setFilters}
@@ -220,7 +269,7 @@ export default function TasksPage() {
         </div>
       )}
 
-      {/* ── Task list ───────────────────────────────────────────────────── */}
+      {/* ── Task list / Kanban ──────────────────────────────────────── */}
       {loading ? (
         <div className="space-y-3">
           {[1, 2, 3].map((i) => (
@@ -232,7 +281,7 @@ export default function TasksPage() {
             </div>
           ))}
         </div>
-      ) : grouped.length === 0 ? (
+      ) : filtered.length === 0 ? (
         <div className="wl-card flex flex-col items-center justify-center py-16 text-center">
           <ListTodo className="h-10 w-10 text-app-muted mb-3" />
           <p className="text-base font-semibold text-app-primary">No tasks found</p>
@@ -251,6 +300,8 @@ export default function TasksPage() {
             </button>
           )}
         </div>
+      ) : taskViewMode === "kanban" ? (
+        <KanbanView tasks={filtered} onEdit={setEditingTask} onDelete={setDeletingId} />
       ) : (
         <div className="space-y-6">
           {grouped.map(([date, dayTasks]) => (
